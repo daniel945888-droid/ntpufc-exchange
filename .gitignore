@@ -1,0 +1,20 @@
+# Node.js (前端)
+node_modules/
+dist/
+build/
+.env
+
+# Go (後端)
+/backend/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# 開發工具與 OS
+.idea/
+.vscode/
+.DS_Store

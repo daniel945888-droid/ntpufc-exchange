@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # 1. 關聯式資料庫 (負責儲存訂單、玩家資金，以及未來的清算交割)
+  postgres:
+    image: postgres:15-alpine
+    container_name: ntpufc_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: exchange_admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: exchange_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  # 2. 記憶體快取 (負責防重放攻擊、Token Bucket 分散式限流)
+  redis:
+    image: redis:7-alpine
+    container_name: ntpufc_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. 資料庫視覺化管理介面 (方便我們等一下直接看 DB 裡面的資料)
+  adminer:
+    image: adminer
+    container_name: ntpufc_adminer
+    restart: always
+    ports:
+      - "8081:8080" # Go 伺服器用了 8080，所以我們把它開在 8081
+    depends_on:
+      - postgres
+
+volumes:
+  pg_data: # 讓資料庫的資料持久化，就算重開機資料也不會不見

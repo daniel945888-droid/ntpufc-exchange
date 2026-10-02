@@ -1,0 +1,34 @@
+package engine
+
+import (
+	"ntpufc-exchange/backend/internal/core/domain"
+	"testing"
+	"time"
+)
+
+func TestOrderBookMatching(t *testing.T) {
+	// ✨ 建立一個容量足夠的測試用假通道 (接收引擎發出的事件)
+	dummyChan := make(chan domain.TradeEvent, 100)
+	ob := NewInMemoryOrderBook(dummyChan)
+
+	// 1. 玩家 C 掛出賣單：價格 95，數量 3
+	orderC := &domain.Order{UserID: "玩家C", Side: domain.Sell, Price: 95, Qty: 3, CreatedAt: time.Now()}
+	ob.PlaceOrder(orderC)
+
+	// 2. 玩家 B 掛出買單：價格 90，數量 10 (買價低於 95，不會成交，進入買單簿排隊)
+	orderB := &domain.Order{UserID: "玩家B", Side: domain.Buy, Price: 90, Qty: 10, CreatedAt: time.Now()}
+	ob.PlaceOrder(orderB)
+
+	// 3. 玩家 A 掛出買單：價格 100，數量 5
+	// (出價 100 高於最便宜的賣價 95，立刻與玩家 C 撮合 3 張，剩下的 2 張進入買單簿排隊)
+	orderA := &domain.Order{UserID: "玩家A", Side: domain.Buy, Price: 100, Qty: 5, CreatedAt: time.Now()}
+	ob.PlaceOrder(orderA)
+
+	// 驗證撮合後的剩餘數量
+	if orderA.Qty != 2 {
+		t.Errorf("玩家 A 應該剩下 2 張未成交，但剩下 %.0f", orderA.Qty)
+	}
+	if orderC.Qty != 0 {
+		t.Errorf("玩家 C 應該全數成交 (剩 0)，但剩下 %.0f", orderC.Qty)
+	}
+}

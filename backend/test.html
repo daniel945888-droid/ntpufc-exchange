@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>高頻交易 - 撮合測試終端</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f0f2f5; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 500px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: inline-block; width: 60px; font-weight: bold; }
+        input, select { padding: 5px; width: 100px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
+        .btn-buy { background: #28a745; color: white; }
+        .btn-sell { background: #dc3545; color: white; }
+        #messages { margin-top: 20px; height: 300px; overflow-y: scroll; background: #1e1e1e; color: #00ff00; padding: 10px; border-radius: 5px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>📈 迎新茶會 - 模擬交易所</h2>
+        
+        <div class="form-group">
+            <label>商品:</label>
+            <input type="text" id="symbol" value="AI_STOCK" disabled>
+        </div>
+        <div class="form-group">
+            <label>價格:</label>
+            <input type="number" id="price" value="100">
+        </div>
+        <div class="form-group">
+            <label>數量:</label>
+            <input type="number" id="qty" value="5">
+        </div>
+        
+        <button class="btn-buy" onclick="sendOrder('buy')">做多 (Buy)</button>
+        <button class="btn-sell" onclick="sendOrder('sell')">做空 (Sell)</button>
+        
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080/ws');
+        const messages = document.getElementById('messages');
+        
+        ws.onopen = () => appendMessage("🟢 系統連線成功，等待下單...");
+        // 1. ✨ 補上這個印字函數，讓它負責把文字塞進黑色的 messages 區塊
+function addMessage(text, color) {
+    const msgBox = document.getElementById("messages");
+    if (!msgBox) return; // 防呆
+    
+    const div = document.createElement("div");
+    div.style.color = color || "white";
+    div.innerText = text;
+    msgBox.appendChild(div);
+    
+    // 自動捲動到最底部
+    msgBox.scrollTop = msgBox.scrollHeight; 
+}
+
+// 2. 這是我們剛剛寫好的推播解析邏輯
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    if (data.error) {
+        addMessage("❌ " + data.error, "red");
+        return;
+    }
+
+    if (data.type === "TRADE_SUCCESS") {
+        const tradeData = data.message; 
+        addMessage("✅ " + tradeData.message, "lime");
+        console.log("💰 收到成交數據：", tradeData);
+        return;
+    }
+
+    // ✨ 新增這段：攔截市場深度廣播，並印在 Console 給你看
+    if (data.type === "MARKET_DEPTH") {
+        const depthData = data.message;
+        addMessage("📊 收到市場深度更新 (請看 F12 Console)", "yellow");
+        console.log("📊 市場深度快照 (Order Book)：", depthData);
+        return;
+    }
+
+    if (data.message) {
+        addMessage("📩 " + data.message, "cyan");
+    }
+};
+        ws.onclose = () => appendMessage("⚫ 已斷線，請檢查伺服器狀態");
+
+        // 發送訂單邏輯
+        function sendOrder(side) {
+            const price = parseFloat(document.getElementById('price').value);
+            const qty = parseFloat(document.getElementById('qty').value);
+            
+            // 嚴格對應 Go 後端的 WsOrderPayload 結構
+            const payload = {
+                action: "place_order",
+                symbol: "AI_STOCK",
+                side: side,
+                price: price,
+                qty: qty,
+                leverage: 1 // 測試階段預設 1 倍
+            };
+
+            ws.send(JSON.stringify(payload));
+            appendMessage(`📤 送出: ${side === 'buy' ? '買入' : '賣出'} ${qty} 張 @ $${price}`);
+        }
+
+        function appendMessage(msg) {
+            messages.innerHTML += `<div>${msg}</div>`;
+            messages.scrollTop = messages.scrollHeight;
+        }
+    </script>
+</body>
+</html>
